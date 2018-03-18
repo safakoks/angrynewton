@@ -1,0 +1,366 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <script src='http://cdn.html5quintus.com/v0.2.0/quintus-all.js'></script>
+  
+    
+    <style>
+        canvas {
+            background-color: #5e81a2;
+        }
+    </style>
+</head>
+<body>
+    <script>
+  
+        var Q = Quintus()
+            .include("Sprites, Scenes, Anim, Input, 2D, Touch, UI, TMX, Input, Audio")
+            .setup({ maximize: true })
+            .controls()
+            .touch().enableSound();
+
+       
+
+        //Extends
+        Q.Sprite.extend("Newton",
+            {
+                init: function (properties) {
+                    // Same name as in the tiled editor
+                    properties.sheet = "Newton";
+           
+                    // Square in the tile set
+                    properties.frame = 0;
+                    this._super(properties, {sprite:"Newton"});
+                    this.add("2d");
+                    this.add("platformerControls");
+                    this.add("animation");
+                    Q.input.on("fire", this, "fireWeapon");
+                    Q.input.on("up", this, "up");
+                    Q.input.on("down", this, "down");
+                }
+                    ,
+                step: function (dt) {
+                    if (Q("Enemy").items.length == 0) {
+                     
+                        if (Level != 0) {
+                            point += 100 * AppleCount;
+                        }
+                                           
+                        //Next Level
+                        Level++;
+                        Q.stageScene("level");
+                     
+                    }
+                    RefreshLabels();
+                    if (Q("Apple").first().p.y > this.p.y + 500) {
+                       
+                        RefreshApple();
+
+                    }
+                        if (this.p.vx > 0) {
+                            this.play("run_right");
+                        } else if (this.p.vx < 0) {
+                            this.play("run_left");
+                        } else {
+                            this.play("stand");
+                            
+                        }
+                }
+                ,//Fire
+                fireWeapon: function (dt) {
+                
+                    var apple = Q("Apple").first();
+                  
+                    if (apple.p.opacity == 0) {
+                        apple.p.gravity = 1;
+                        apple.p.opacity = 1;
+                        apple.p.collisionMask = 1;
+                        apple.p.ay = 0;
+                        apple.p.vy = -700;
+                        apple.p.vx = Powerx;
+                        apple.p.ax = -(Powerx / 100);
+                        apple.p.x = this.p.x + 20;
+                        apple.p.y = this.p.y - 20;  
+                        
+                    }
+                     
+                   
+                },
+                up: function () {
+                    ChangePower(50);
+                },
+                down: function () {
+                    ChangePower(-50);
+                }
+                }
+            );
+        Q.Sprite.extend("Enemy",
+            {
+                init: function (properties) {
+                    // Same name as in the tiled editor
+                    properties.sheet = "EnemyTanks";
+                    // Square in the tile set
+                    properties.frame = 1;
+
+                    this._super(properties, { vx: 100 });
+                    this.add("2d,aiBounce");
+                    this.on("bump.top,bump.left", function (collision) {
+                        if (collision.obj.isA("Apple")) {
+
+                            this.destroy();
+                            Q.audio.play("destroy.mp3");
+                            AppleCount++;
+                            RefreshApple();
+
+                        }
+
+
+
+
+                    });
+                }
+            });
+
+        Q.MovingSprite.extend("Apple", {
+            init: function (properties) {
+                properties.sheet = "Fruits";
+                properties.frame = 2;
+                properties.visible = false;
+                this._super(properties);
+                this.add("2d");
+                this.on("bump.left,bump.right,bump.bottom,bump.top", function (collision) {
+                    if (!collision.obj.isA("Newton")) {
+
+                        RefreshApple();
+
+
+
+                    }
+
+
+
+                });
+            },
+            step: function (dt) {
+
+                if (this.p.vx < 0) {
+
+                    this.p.ax = 0;
+                    this.p.vx = 0;
+                }
+            }
+        });
+
+
+        //Functions
+        function ChangePower(a) {
+            if (!(a < 0 && Powerx == 100)) {
+                   
+                Powerx += a;
+                
+            }
+       
+         
+    
+          
+        }
+        function RefreshLabels() {
+            if (Level != 0) {
+                Q("Q.UI.Text").stage.items.reverse();
+                Q("Q.UI.Text").stage.items[0].p.label = "Potential Energy = " + Powerx;
+                Q("Q.UI.Text").stage.items[1].p.label = "Point = " + (100 * AppleCount) + " / Total Point = " + point;
+            }
+        }
+        function RefreshApple() {
+            Q.audio.play("apple.mp3");
+            var apple = Q("Apple").first();
+            apple.p.vy = 0;
+            apple.p.gravity = 0;
+            apple.p.vx =0;
+            apple.p.ax =0;
+            apple.p.opacity = 0;
+            AppleCount--;
+            apple.p.x  =100;
+            apple.p.y = -100;
+            RefreshLabels();
+           
+       
+        
+
+        }
+        function CalculateHighscore() {
+            var highscore = 0;
+            var scores = localStorage.Scores.split(',');
+            for (var i = 0; i < scores.length; i++) {
+                if (scores[i] > highscore) {
+                    highscore = scores[i];
+                }
+            }
+            return highscore;
+            
+        }
+        //Newtons animation
+        Q.animations('Newton', {
+            run_right: { frames: [0, 1, 4, 8, 12], rate: 1 / 3 },
+            run_left: { frames: [0, 1, 4, 8, 12], rate: 1 / 3 },
+            stand: { frames: [0], rate: 1 / 5 },
+           
+     
+        });
+
+
+        // Global Variables
+        var Powerx = 200;
+        var Level = 1;
+        var LevelCount = 8;
+        var AppleCount = 100;
+        var point = 0;
+        var tmxs = "main.mp3,destroy.mp3,apple.mp3,";
+
+        // Loading
+        Q.scene("level", function (stage) {
+            if (Level > LevelCount) {
+                localStorage.Scores += point + ",";
+                alert("a");
+                Q.stageTMX("level0data.tmx.tmx", stage);
+                alert("b");
+                Q.audio.stop();
+
+            } else {
+                Q.stageTMX("level" + Level + "data.tmx", stage);
+                Q.audio.stop();
+        
+                Q.audio.play("level" + Level + ".mp3");
+            }
+
+         
+
+            
+            var newton = Q("Newton").first();
+            RefreshApple();
+            AppleCount = 100;
+            //apple.p.collisionMask = 0;
+            //apple.p.opacity = 0;
+      
+             
+            var container = stage.insert(new Q.UI.Container({
+                fill: "gray",
+                border: 5,
+                shadow: 10,
+                shadowColor: "rgba(0,0,0,0.5)",
+                y: 50,
+                x: Q.width / 2
+            }));
+            if (Level > LevelCount) {
+             
+                Level = 0;
+                stage.insert(new Q.UI.Text({
+                    label: "Your Score is " + point,
+                    color: "green",
+                    size: 40,
+                    x: 0,
+                    y: 0
+                }), container);
+
+                stage.insert(new Q.UI.Text({
+                    label: "Highscore is " + CalculateHighscore(),
+                    color: "red",
+                    size: 45,
+                    x: 0,
+                    y: 45,
+                }), container);
+
+                stage.insert(new Q.UI.Text({
+                    label: "Hit The TANK! to play again!!... ",
+                    color: "blue",
+                    size: 15,
+                    x: 0,
+                    y: 60,
+                }), container);
+               
+            }
+            else if (Level!=0) {
+                stage.insert(new Q.UI.Text({
+                    label: "Level " + Level,
+                    color: "white",
+                    x: 0,
+                    y: 0
+                }), container);
+
+                stage.insert(new Q.UI.Text({
+                    label: "Point = " + (100 * AppleCount) + " / Total Point = " + point,
+                    color: "green",
+                    size: 15,
+                    x: 0,
+                    y: 25,
+                }), container);
+                stage.insert(new Q.UI.Text({
+                    label: "Potential Energy = " + Powerx,
+                    color: "white",
+                    name: "board",
+                    x: 0,
+                    y: 50,
+                }), container);
+        
+            }
+            else  if (Level==0) {
+                stage.insert(new Q.UI.Text({
+                    label: "ANGRY NEWTON",
+                    size : 50,
+                    color: "red",
+                    x: -100,
+                    y: 0
+                }), container);
+
+                stage.insert(new Q.UI.Text({
+                    label: "Just jump to storage potential energy and throw the apple to destroy Tanks!",
+                    color: "aqua",
+                    size:30,
+                    x: -100,
+                    y: 50,
+                }), container);
+                stage.insert(new Q.UI.Text({
+                    label: "CONTROLS : SPACE for throwing , UP-DOWN-LEFT-RIGHT for moving, UP-DOWN also for managing your Potentian Energy",
+                    color: "white",
+                    size:15,
+                    x: -100,
+                    y: 100,
+                }), container);
+                stage.insert(new Q.UI.Text({
+                    label: "Point = m(Newton's Mass)*a(Apple) / Newton starts with 100 apples for each level" ,
+                    color: "green",
+                    size: 15,
+                    x: -100,
+                    y: 120,
+                }), container);
+                stage.insert(new Q.UI.Text({
+                    label: "Hit the TANK! to START!",
+                    color: "red",
+                    size: 40,
+                    x: -100,
+                    y: 150,
+                }), container);
+            }
+          
+        });
+        //Calculation
+        for (var i = 0; i < LevelCount + 1; i++) {
+            tmxs += "level" + i + "data.tmx,";
+            tmxs += "level" + i + ".mp3,";
+        }
+        tmxs = tmxs.trimRight(',');
+        Q.loadTMX(tmxs, function () {
+
+            Q.stageScene("level");
+
+        });
+
+
+ 
+       
+       
+   
+
+    </script>
+</body>
+</html>
